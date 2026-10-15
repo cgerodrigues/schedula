@@ -1,0 +1,1618 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Schedula API",
+    "version": "0.1.0",
+    "description": "Sessão HttpOnly e CSRF. Obtenha token/header em /api/auth/csrf antes de POST/DELETE. Atualize o token após login/logout. Horários em America/Fortaleza."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080"
+    }
+  ],
+  "security": [
+    {
+      "session": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "JSESSIONID"
+      }
+    },
+    "schemas": {
+      "Municipality": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "stateCode": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$"
+          }
+        },
+        "required": [
+          "name",
+          "stateCode"
+        ]
+      },
+      "Unit": {
+        "type": "object",
+        "required": [
+          "municipalityId",
+          "stateCode",
+          "name",
+          "areas",
+          "phone",
+          "postalCode",
+          "street",
+          "streetNumber",
+          "neighborhood"
+        ],
+        "properties": {
+          "municipalityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "stateCode": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "areas": {
+            "type": "array",
+            "uniqueItems": true,
+            "minItems": 1,
+            "maxItems": 2,
+            "items": {
+              "type": "string",
+              "enum": [
+                "CIVEL",
+                "CRIMINAL"
+              ]
+            }
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 254
+          },
+          "postalCode": {
+            "type": "string",
+            "pattern": "^[0-9]{5}-?[0-9]{3}$"
+          },
+          "street": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "streetNumber": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "complement": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "neighborhood": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "active": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "Defender": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "name"
+        ]
+      },
+      "Affiliation": {
+        "type": "object",
+        "properties": {
+          "defenderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unitId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "area": {
+            "type": "string",
+            "enum": [
+              "CIVEL",
+              "CRIMINAL"
+            ]
+          }
+        },
+        "required": [
+          "defenderId",
+          "unitId",
+          "area"
+        ]
+      },
+      "Publish": {
+        "type": "object",
+        "properties": {
+          "affiliationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "start": {
+            "type": "string",
+            "format": "time"
+          },
+          "end": {
+            "type": "string",
+            "format": "time"
+          },
+          "minutes": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 240
+          },
+          "repeatUntil": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          }
+        },
+        "required": [
+          "affiliationId",
+          "date",
+          "start",
+          "end",
+          "minutes"
+        ]
+      },
+      "Block": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 250
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "reason"
+        ]
+      },
+      "Reschedule": {
+        "type": "object",
+        "properties": {
+          "slotId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "slotId"
+        ]
+      },
+      "Status": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "COMPARECEU",
+              "REALIZADO",
+              "NAO_COMPARECEU"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "ActivationToken": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "Activation": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "password": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "confirmation": {
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "token",
+          "password",
+          "confirmation"
+        ]
+      },
+      "PasswordChange": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "password": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "confirmation": {
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "currentPassword",
+          "password",
+          "confirmation"
+        ]
+      }
+    }
+  },
+  "paths": {
+    "/api/rh/municipalities": {
+      "get": {
+        "summary": "RH: listar municipalities",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        }
+      },
+      "post": {
+        "summary": "RH: cadastrar municipalities",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Municipality"
+              }
+            }
+          }
+        },
+        "deprecated": true,
+        "description": "Compatibilidade legada; não marca catálogo completo. O painel usa o catálogo IBGE."
+      }
+    },
+    "/api/rh/units": {
+      "get": {
+        "summary": "RH: listar units",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        }
+      },
+      "post": {
+        "summary": "RH: cadastrar units",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Unit"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rh/defenders": {
+      "get": {
+        "summary": "RH: listar defenders",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        }
+      },
+      "post": {
+        "summary": "RH: cadastrar defenders",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Defender"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rh/affiliations": {
+      "get": {
+        "summary": "RH: listar affiliations",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        }
+      },
+      "post": {
+        "summary": "RH: cadastrar affiliations",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Affiliation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rh/affiliations/{id}": {
+      "delete": {
+        "summary": "RH: remover vínculo sem histórico",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/defender/affiliations": {
+      "get": {
+        "summary": "Defensor: listar seus affiliations",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        }
+      }
+    },
+    "/api/defender/slots": {
+      "get": {
+        "summary": "Defensor: listar seus slots",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        }
+      },
+      "post": {
+        "summary": "Publicar agenda avulsa ou semanal",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Publish"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/defender/blocks": {
+      "get": {
+        "summary": "Defensor: listar seus blocks",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        }
+      },
+      "post": {
+        "summary": "Bloquear sem apagar reservas",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Block"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/defender/appointments": {
+      "get": {
+        "summary": "Defensor: listar seus appointments",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        }
+      }
+    },
+    "/api/defender/series/{series}": {
+      "delete": {
+        "summary": "Retirar publicação sem reservas ativas",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "series",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/defender/appointments/{appointment}/cancel": {
+      "post": {
+        "summary": "Defensor: cancel",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "appointment",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/defender/appointments/{appointment}/reschedule": {
+      "post": {
+        "summary": "Defensor: reschedule",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "appointment",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Reschedule"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/defender/appointments/{appointment}/status": {
+      "post": {
+        "summary": "Defensor: status",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "appointment",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Status"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "summary": "me",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        }
+      }
+    },
+    "/api/auth/csrf": {
+      "get": {
+        "summary": "csrf",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "summary": "Autenticar com formulário e CSRF",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          },
+          "204": {
+            "description": "Sessão autenticada"
+          },
+          "429": {
+            "description": "Limite por endereço atingido",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Segundos até nova tentativa"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "username",
+                  "password"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "summary": "Encerrar sessão",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          },
+          "204": {
+            "description": "Sessão encerrada"
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/webhooks/whatsapp": {
+      "get": {
+        "summary": "Verificação Meta",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        },
+        "security": [],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "hub.mode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hub.verify_token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hub.challenge",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "post": {
+        "summary": "Webhook oficial autenticado por HMAC SHA-256",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hub-Signature-256",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rh/notifications": {
+      "get": {
+        "summary": "RH: últimos 100 envios, sem conteúdo pessoal",
+        "responses": {
+          "200": {
+            "description": "Lista de status de envio"
+          }
+        }
+      }
+    },
+    "/api/rh/notifications/{id}/retry": {
+      "post": {
+        "summary": "RH: reenfileirar notificação com falha",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reenfileirada"
+          },
+          "409": {
+            "description": "Não está em falha"
+          }
+        }
+      }
+    },
+    "/api/rh/defenders/{id}/invitation": {
+      "post": {
+        "summary": "RH: gerar convite por 24h e revogar anterior",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operação concluída",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string",
+                      "description": "Exibido uma vez; não registrar."
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "403": {
+            "description": "Papel ou CSRF inválido"
+          },
+          "409": {
+            "description": "Convite inválido, expirado, utilizado ou regra de senha não atendida"
+          }
+        }
+      },
+      "delete": {
+        "summary": "RH: revogar convite",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "403": {
+            "description": "Papel ou CSRF inválido"
+          },
+          "409": {
+            "description": "Convite inválido, expirado, utilizado ou regra de senha não atendida"
+          }
+        }
+      }
+    },
+    "/api/auth/activation/check": {
+      "post": {
+        "summary": "Validar convite sem consumir",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "403": {
+            "description": "Papel ou CSRF inválido"
+          },
+          "409": {
+            "description": "Convite inválido, expirado, utilizado ou regra de senha não atendida"
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationToken"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/activation": {
+      "post": {
+        "summary": "Ativar conta e exigir login",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "403": {
+            "description": "Papel ou CSRF inválido"
+          },
+          "409": {
+            "description": "Convite inválido, expirado, utilizado ou regra de senha não atendida"
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Activation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/password": {
+      "post": {
+        "summary": "Alterar senha e encerrar sessão atual",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "403": {
+            "description": "Papel ou CSRF inválido"
+          },
+          "409": {
+            "description": "Convite inválido, expirado, utilizado ou regra de senha não atendida"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChange"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rh/units/{id}": {
+      "put": {
+        "summary": "RH: editar unidade preservando UUID e histórico",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Unit"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rh/states": {
+      "get": {
+        "summary": "RH: listar as 27 UFs oficiais",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/api/rh/catalog/{uf}": {
+      "get": {
+        "summary": "RH: catálogo oficial local; sincroniza quando incompleto",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uf",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/rh/catalog/{uf}/sync": {
+      "post": {
+        "summary": "RH: sincronizar catálogo IBGE atomicamente",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uf",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-TOKEN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/rh/postal/{cep}": {
+      "get": {
+        "summary": "RH: consultar ViaCEP; falhas permitem preenchimento manual",
+        "responses": {
+          "200": {
+            "description": "Operação concluída"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Perfil ou CSRF inválido"
+          },
+          "409": {
+            "description": "Conflito de regra de negócio"
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cep",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    }
+  }
+}
