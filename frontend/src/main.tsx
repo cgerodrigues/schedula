@@ -2,11 +2,12 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { api, type Row } from "./api";
 import { Field, Form } from "./components";
+import { navigate, unitsPath, useLocation } from "./navigation";
 import InstitutionPanel from "./InstitutionPanel";
 import DefenderPanel from "./DefenderPanel";
 import "./style.css";
 import { Activation, PasswordChange } from "./AccountAccess";
-function App() {
+export function App() {
   const [activationToken, setActivationToken] = useState(
     () =>
       new URLSearchParams(window.location.hash.slice(1)).get("activate") || "",
@@ -31,7 +32,12 @@ function App() {
   }, []);
   const [user, setUser] = useState<Row | null>(null);
   const [loading, setLoading] = useState(true);
-  const [section, setSection] = useState("overview");
+  const location = useLocation();
+  const section = location.path.startsWith(unitsPath)
+    ? "units"
+    : location.state.section || "overview";
+  const setSection = (key: string) =>
+    navigate(key === "units" ? unitsPath : "/", { section: key });
   const [data, setData] = useState<Record<string, Row[]>>({});
   const [error, setError] = useState("");
   async function identify() {
@@ -47,16 +53,11 @@ function App() {
     void identify();
   }, []);
   async function reload() {
-    if (!user) return;
+    if (!user || (user.role === "RH" && section === "units")) return;
     const role = user.role === "RH" ? "rh" : "defender";
     const resources =
       role === "rh"
-        ? [
-            "units",
-            "defenders",
-            "affiliations",
-            "notifications",
-          ]
+        ? ["units", "defenders", "affiliations", "notifications"]
         : ["affiliations", "appointments", "slots", "blocks"];
     const results = await Promise.all(
       resources.map(async (key) => [key, await api("/" + role + "/" + key)]),
@@ -69,7 +70,7 @@ function App() {
       setError("");
       void reload().catch((e) => setError(e.message));
     }
-  }, [user]);
+  }, [user, section]);
   if (activationToken) return <Activation token={activationToken} />;
   if (loading) return <div className="loading">Carregando Schedula…</div>;
   if (!user)
@@ -113,7 +114,6 @@ function App() {
                   password: String(f.get("password")),
                 }),
               );
-              setSection("overview");
               await identify();
             }}
           >
@@ -213,22 +213,31 @@ function App() {
               ? "Organize a rede. Amplie o acesso ao atendimento."
               : "Seu tempo organizado, seu atendimento mais próximo."}
           </p>
-          <button
-            className="text-button"
-            onClick={() => {
-              setError("");
-              void reload().catch((e) => setError(e.message));
-            }}
-          >
-            Atualizar ↻
-          </button>
+          {section !== "units" && (
+            <button
+              className="text-button"
+              onClick={() => {
+                setError("");
+                void reload().catch((e) => setError(e.message));
+              }}
+            >
+              Atualizar ↻
+            </button>
+          )}
         </div>
         {error && (
           <p className="error" role="alert">
             {error}
           </p>
         )}
-        {section === "password" ? (
+        {section === "units" && user.role !== "RH" ? (
+          <div role="alert">
+            Você não tem permissão para acessar a gestão de unidades.
+            <button className="ghost" onClick={() => setSection("overview")}>
+              Voltar ao painel
+            </button>
+          </div>
+        ) : section === "password" ? (
           <PasswordChange
             onChanged={() => {
               setUser(null);
@@ -248,8 +257,10 @@ function App() {
     </div>
   );
 }
-createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-);
+const root = document.getElementById("root");
+if (root)
+  createRoot(root).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  );

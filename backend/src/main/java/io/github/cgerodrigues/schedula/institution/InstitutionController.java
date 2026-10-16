@@ -36,6 +36,22 @@ public class InstitutionController {
     return service.units();
   }
 
+  @GetMapping("/units/search")
+  public Object searchUnits(
+      @RequestParam(defaultValue = "") String name,
+      @RequestParam(defaultValue = "") String municipality,
+      @RequestParam(defaultValue = "") String area,
+      @RequestParam(required = false) Boolean active,
+      @RequestParam(defaultValue = "1") int page,
+      @RequestParam(defaultValue = "10") int size) {
+    return service.searchUnits(name, municipality, area, active, page, size);
+  }
+
+  @GetMapping("/units/{id}")
+  public Object unit(@PathVariable UUID id) {
+    return service.unit(id);
+  }
+
   @PostMapping("/units")
   public Object unit(@Valid @RequestBody UnitService.Input r, Principal p) {
     return Map.of("id", units.save(null, r, p.getName()));

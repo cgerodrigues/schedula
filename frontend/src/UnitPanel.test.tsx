@@ -10,6 +10,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import UnitPanel, { UnitForm } from "./UnitPanel";
+import { unitsPath } from "./navigation";
 import { api } from "./api";
 import { phoneMask, cepMask } from "./unitFields";
 vi.mock("./api", () => ({ api: vi.fn() }));
@@ -67,13 +68,18 @@ const defaults = async (path: string) => {
   if (path.startsWith("/rh/postal/")) return postal;
   return { id: "saved" };
 };
-beforeEach(() => mock.mockImplementation(defaults as typeof api));
+beforeEach(() => {
+  window.history.replaceState({}, "", unitsPath);
+  mock.mockImplementation(defaults as typeof api);
+});
 afterEach(() => {
   cleanup();
   vi.resetAllMocks();
 });
 const field = (label: string) =>
-  screen.getByLabelText(label) as HTMLInputElement;
+  screen.getByLabelText(label, {
+    selector: "input,select",
+  }) as HTMLInputElement;
 const change = (label: string, value: string) =>
   fireEvent.change(field(label), { target: { value } });
 async function editor(u: typeof unit = unit) {
@@ -103,7 +109,7 @@ describe("unit fields", () => {
     change("Número", "S/N");
     change("Complemento (opcional)", "Sala 2");
     change("Bairro", "Novo bairro");
-    fireEvent.click(screen.getByText("Salvar unidade"));
+    fireEvent.click(screen.getByText("Salvar alterações"));
     await screen.findByText("Unidade salva com sucesso.");
     expect(mock).toHaveBeenCalledWith(
       "/rh/units/unit",
@@ -121,9 +127,12 @@ describe("unit fields", () => {
   });
   it("filters municipalities by search and clears selection after changing state", async () => {
     await editor();
-    change("Pesquisar município", "cauc");
+    fireEvent.click(field("Município"));
+    change("Município", "cauc");
     expect(screen.getByRole("option", { name: "Caucaia" })).toBeTruthy();
     change("Estado", "PE");
+    await screen.findByText("Catálogo oficial salvo localmente");
+    fireEvent.click(field("Município"));
     await screen.findByRole("option", { name: "Recife" });
     expect(field("Município").value).toBe("");
     expect(screen.queryByRole("option", { name: "Caucaia" })).toBeNull();
@@ -132,11 +141,11 @@ describe("unit fields", () => {
     await editor();
     fireEvent.click(field("Cível"));
     fireEvent.click(field("Criminal"));
-    fireEvent.click(screen.getByText("Salvar unidade"));
+    fireEvent.click(screen.getByText("Salvar alterações"));
     await screen.findByText("Selecione ao menos uma área de atendimento.");
     fireEvent.click(field("Cível"));
     mock.mockRejectedValueOnce(new Error("Área possui vínculos"));
-    fireEvent.click(screen.getByText("Salvar unidade"));
+    fireEvent.click(screen.getByText("Salvar alterações"));
     await screen.findByText("Área possui vínculos");
     expect(field("Nome da unidade").value).toBe("Unidade Centro");
   });
@@ -159,7 +168,7 @@ describe("unit fields", () => {
     change("CEP", "60175001");
     await screen.findByText("ViaCEP indisponível. Preencha manualmente.");
     expect(field("Logradouro").value).toBe("Rua manual");
-    fireEvent.click(screen.getByText("Salvar unidade"));
+    fireEvent.click(screen.getByText("Salvar alterações"));
     await screen.findByText("Unidade salva com sucesso.");
   });
   it("requires explicit confirmation and official matching before changing CEP city", async () => {
@@ -171,10 +180,10 @@ describe("unit fields", () => {
     change("CEP", "50000000");
     await screen.findByText(/O CEP indica Recife/);
     expect(field("Estado").value).toBe("CE");
-    fireEvent.click(screen.getByText("Salvar unidade"));
+    fireEvent.click(screen.getByText("Salvar alterações"));
     await screen.findByText(/Confirme ou mantenha/);
     fireEvent.click(screen.getByText("Usar município do CEP"));
-    await waitFor(() => expect(field("Município").value).toBe("recife"));
+    await waitFor(() => expect(field("Município").value).toBe("Recife"));
     expect(field("Estado").value).toBe("PE");
     expect(field("Logradouro").value).toBe("Rua manual");
   });
@@ -188,7 +197,7 @@ describe("unit fields", () => {
     await screen.findByText(/O CEP indica Recife/);
     fireEvent.click(screen.getByText("Manter localização selecionada"));
     expect(field("Estado").value).toBe("CE");
-    expect(field("Município").value).toBe("fortaleza");
+    expect(field("Município").value).toBe("Fortaleza");
   });
   it("ignores old CEP responses", async () => {
     let resolveOld!: (value: unknown) => void;
@@ -223,12 +232,13 @@ describe("unit fields", () => {
     expect(resolveOld).toBeUndefined();
     change("CEP", "60175001");
     await waitFor(() => expect(resolveOld).toBeTypeOf("function"));
-    change("Município", "caucaia");
+    fireEvent.click(field("Município"));
+    fireEvent.click(screen.getByRole("option", { name: "Caucaia" }));
     await act(async () => {
       resolveOld(postal);
     });
     expect(field("Logradouro").value).toBe("");
-    expect(field("Município").value).toBe("caucaia");
+    expect(field("Município").value).toBe("Caucaia");
   });
   it("prevents duplicate saves while pending", async () => {
     let finish!: (value: unknown) => void;
@@ -239,7 +249,7 @@ describe("unit fields", () => {
           })
         : defaults(path)) as typeof api);
     await editor();
-    const button = screen.getByText("Salvar unidade");
+    const button = screen.getByText("Salvar alterações");
     fireEvent.click(button);
     fireEvent.click(button);
     expect(mock.mock.calls.filter((c) => c[1] === "PUT")).toHaveLength(1);
@@ -247,10 +257,20 @@ describe("unit fields", () => {
     await screen.findByText("Unidade salva com sucesso.");
   });
   it("opens the reusable editor from the existing unit list", async () => {
-    render(<UnitPanel units={[unit]} reload={vi.fn()} />);
-    fireEvent.click(screen.getByText("Editar Unidade Centro"));
+    mock.mockImplementation((async (path: string) =>
+      path.startsWith("/rh/units/search")
+        ? { items: [unit], total: 1, page: 1, size: 10, totalPages: 1 }
+        : path === "/rh/units/unit"
+          ? unit
+          : defaults(path)) as typeof api);
+    render(<UnitPanel />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Editar Unidade Centro" }),
+    );
     await screen.findByText("Editar unidade");
-    expect(field("Nome da unidade").value).toBe("Unidade Centro");
+    await waitFor(() =>
+      expect(field("Nome da unidade").value).toBe("Unidade Centro"),
+    );
   });
 
   it("looks up the original CEP again after a later change", async () => {
@@ -258,6 +278,76 @@ describe("unit fields", () => {
     change("CEP", "60175001");
     await screen.findByText(/CEP consultado/);
     change("CEP", "60175000");
-    await waitFor(() => expect(mock).toHaveBeenCalledWith("/rh/postal/60175000"));
+    await waitFor(() =>
+      expect(mock).toHaveBeenCalledWith("/rh/postal/60175000"),
+    );
   });
+});
+
+it("reuses the loaded catalog when returning to the same state", async () => {
+  await editor();
+  change("Estado", "PE");
+  await screen.findByText("Catálogo oficial salvo localmente");
+  change("Estado", "CE");
+  await screen.findByText("Catálogo oficial salvo localmente");
+  expect(
+    mock.mock.calls.filter(([path]) => path === "/rh/catalog/CE"),
+  ).toHaveLength(1);
+  expect(screen.queryByText("Sincronizar municípios")).toBeNull();
+});
+it("ignores a stale state catalog while retaining the new selection", async () => {
+  let finish!: (value: unknown) => void;
+  mock.mockImplementation((async (path: string) =>
+    path === "/rh/catalog/CE"
+      ? new Promise<unknown>((resolve) => {
+          finish = resolve;
+        })
+      : defaults(path)) as typeof api);
+  render(<UnitForm unit={unit} onSaved={vi.fn()} onCancel={vi.fn()} />);
+  await screen.findByRole("option", { name: "Pernambuco (PE)" });
+  change("Estado", "PE");
+  await screen.findByText("Catálogo oficial salvo localmente");
+  await act(async () => finish(catalog));
+  fireEvent.click(field("Município"));
+  expect(screen.getByRole("option", { name: "Recife" })).toBeTruthy();
+  expect(screen.queryByRole("option", { name: "Fortaleza" })).toBeNull();
+});
+
+it("shows catalog failure once, preserves fields and retries only on request", async () => {
+  let peCalls = 0;
+  mock.mockImplementation((async (path: string) => {
+    if (path === "/rh/catalog/PE" && ++peCalls === 1)
+      throw new Error(
+        "IBGE indisponível e não há catálogo oficial local para esta UF. Tente novamente.",
+      );
+    return defaults(path);
+  }) as typeof api);
+  await editor();
+  change("Nome da unidade", "Nome preservado");
+  change("Estado", "PE");
+  const failure = await screen.findByRole("alert");
+  expect(failure.textContent).toContain(
+    "Os demais dados do formulário foram preservados",
+  );
+  expect(screen.getAllByText(/IBGE indisponível/)).toHaveLength(1);
+  expect(field("Nome da unidade").value).toBe("Nome preservado");
+  expect(field("Logradouro").value).toBe("Rua manual");
+  expect(field("Município").value).toBe("");
+  expect(field("Município").disabled).toBe(true);
+  fireEvent.click(screen.getByLabelText("Fechar aviso"));
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(field("Município").disabled).toBe(true);
+  expect(peCalls).toBe(1);
+  fireEvent.click(screen.getByText("Tentar novamente"));
+  await screen.findByText("Catálogo oficial salvo localmente");
+  fireEvent.click(field("Município"));
+  fireEvent.click(screen.getByRole("option", { name: "Recife" }));
+  expect(field("Município").value).toBe("Recife");
+  expect(peCalls).toBe(2);
+  change("Estado", "CE");
+  await screen.findByText("Catálogo oficial salvo localmente");
+  expect(
+    mock.mock.calls.filter(([path]) => path === "/rh/catalog/CE"),
+  ).toHaveLength(1);
+  expect(screen.queryByText("Tentar novamente")).toBeNull();
 });

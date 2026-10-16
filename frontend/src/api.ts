@@ -32,9 +32,11 @@ export async function api<T = Row[]>(
       detail.detail ||
         (response.status === 401
           ? "Sessão expirada ou credenciais inválidas. Entre novamente."
-          : response.status === 403
-            ? "Você não tem permissão para esta operação."
-            : "Não foi possível concluir. Verifique os dados e tente novamente."),
+          : response.status === 404
+            ? "Registro não encontrado ou indisponível."
+            : response.status === 403
+              ? "Você não tem permissão para esta operação."
+              : "Não foi possível concluir. Verifique os dados e tente novamente."),
     );
   }
   const text = await response.text();

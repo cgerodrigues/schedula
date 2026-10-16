@@ -50,6 +50,22 @@ class CatalogIntegrationTest extends IntegrationBase {
   }
 
   @Test
+  void automaticallyImportsAnAbsentStateThenReusesItWithoutChangingExistingMunicipalities() {
+    var existing = db.list("select * from municipality order by id");
+    when(ibge.municipalities("PE"))
+        .thenReturn(List.of(new IbgeClient.City("2611606", "Recife", "PE")));
+    var first = catalog.list("PE", false);
+    assertTrue(first.complete());
+    assertEquals("Recife", first.municipalities().getFirst().get("name"));
+    var second = catalog.list("PE", false);
+    assertEquals(first.municipalities(), second.municipalities());
+    verify(ibge, times(1)).municipalities("PE");
+    assertEquals(existing, db.list("select * from municipality where state_code='CE' order by id"));
+    assertEquals(1, db.jdbc.queryForObject(
+        "select count(*) from municipality where state_code='PE'", Integer.class));
+  }
+
+  @Test
   void partialCatalogDoesNotCountAsSyncedAndOfflineFallbackIsExplicit() {
     when(ibge.municipalities("CE")).thenThrow(new DomainException("offline"));
     var result = catalog.list("CE", false);

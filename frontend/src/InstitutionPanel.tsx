@@ -127,7 +127,7 @@ export default function InstitutionPanel({
           </Card>
         </>
       )}
-      {section === "units" && <UnitPanel units={units} reload={reload} />}
+      {section === "units" && <UnitPanel />}
       {section === "defenders" && (
         <div className="split">
           <Card title="Cadastrar defensor">

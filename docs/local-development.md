@@ -147,11 +147,34 @@ Testes `CatalogIntegrationTest`, `LocationClientsTest`, `UnitIntegrationTest` e 
 Na validação de 14/10/2026, o endpoint IBGE enviou apenas o certificado final, sem o intermediário Sectigo. O JDK Temurin 21.0.12.1 local rejeita essa cadeia e bloqueia busca AIA por padrão. Quando esse mesmo diagnóstico se repetir, pode-se habilitar **somente** a busca do emissor anunciado pelo certificado:
 
 ```sh
-export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }-Dcom.sun.security.enableAIAcaIssuers=true -Dcom.sun.security.allowedAIALocations=http://crt.sectigo.com/SectigoPublicServerAuthenticationCADVR36.crt"
+cd ~/dev/personal/schedula
+set -a
+source .env
+set +a
+cd backend
+JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }-Dcom.sun.security.enableAIAcaIssuers=true -Dcom.sun.security.allowedAIALocations=http://crt.sectigo.com/SectigoPublicServerAuthenticationCADVR36.crt" \
 SERVER_PORT=8081 ./mvnw spring-boot:run
 ```
 
 A validação de hostname, assinatura e raízes confiáveis continua ativa; nenhum certificado é aceito indiscriminadamente e nenhum truststore global é modificado. A URL AIA transporta um certificado público cuja assinatura é validada pelo JDK. Essa configuração é específica da cadeia observada e pode deixar de ser necessária quando o servidor corrigir a cadeia. Não usar `trust-all` ou desativar TLS. Em indisponibilidade, o catálogo completo já salvo continua funcionando.
+
+Na correção E1-01 (15/10/2026), o JDK local sem essas opções reproduziu
+`SSLHandshakeException / PKIX path building failed`, antes da resposta HTTP.
+Com as opções acima, a consulta real a `/api/v1/localidades/estados/PE/municipios`
+retornou HTTP 200; o próprio `IbgeClient` processou 185 municípios, incluindo
+Recife (2611606). Não foi necessário alterar o cliente HTTP nem o truststore.
+
+Se o backend já estiver em execução, encerre-o com Ctrl+C no terminal original e
+reinicie com o comando acima: exportar opções em outro terminal não altera a JVM
+existente. O frontend deve apontar para essa porta (`SCHEDULA_API_URL=http://localhost:8081`).
+O comando apenas lê `.env`; não o modifica e não exibe suas credenciais.
+
+Homologue CE → Morada Nova → PE → Recife → CE, sem salvar unidade. Em falha,
+o formulário mostra um único aviso e oferece “Tentar novamente”, sem tentativas
+automáticas em loop. Os campos preenchidos são mantidos. A consulta real ao IBGE
+foi validada separadamente; o processo de homologação já aberto não foi reiniciado
+por esta correção. Persistência, reutilização e falhas são verificadas em testes
+isolados, sem depender da rede externa.
 
 ## Validação da gestão de unidades (14/10/2026)
 
@@ -163,3 +186,23 @@ A validação de hostname, assinatura e raízes confiáveis continua ativa; nenh
 - Navegador, em banco descartável: login RH, navegação sem Municípios, pesquisa e seleção real de Fortaleza/CE e Recife/PE, cadastro, edição, endereço automático ViaCEP, correção manual, máscaras fixa/celular, áreas, situação e atualização da listagem. Validação de ausência de áreas confirmada na interface. Layout conferido em desktop de 1280px e móvel de 390px, sem transbordamento horizontal.
 - Divergência de CEP, confirmação explícita, falhas externas e descarte de respostas antigas também são cobertos nos testes de interface. O aceite do aviso divergente não foi concluído no teste visual; não se confunde essa cobertura automatizada com interação real.
 - Consultas reais IBGE/ViaCEP aprovadas com a configuração TLS específica descrita acima; as 27 UFs locais foram comparadas ao endpoint oficial de estados. Os testes automatizados continuam usando mocks.
+
+
+### Gestão de unidades — Etapa 1
+
+As telas usam `/rh/unidades`, `/rh/unidades/nova` e `/rh/unidades/:id/editar`.
+A History API mantém URLs, filtros e navegação voltar/avançar sem uma nova dependência;
+as outras seções mantêm o menu existente. O servidor Vite já fornece o fallback da SPA.
+Ao hospedar `frontend/dist`, configurar fallback para `index.html` nas rotas da interface,
+preservando o encaminhamento de `/api` ao backend.
+
+A lista usa `GET /api/rh/units/search` (`name`, `municipality`, `area`, `active`, `page`,
+`size`; página inicial 1, limite 100). A resposta contém `items`, `total`, `page`, `size`
+e `totalPages`. Filtros são combinados no banco, com ordenação por nome e UUID.
+`GET /api/rh/units/{id}` carrega a edição. O antigo `GET /api/rh/units` mantém o array.
+Nenhuma migration é necessária. O catálogo existente continua sendo carregado automaticamente;
+o formulário reutiliza consultas por UF durante a edição, sem botão de sincronização.
+
+Homologação: no menu Unidades, combine filtros, avance uma página, abra/cancele uma edição,
+cadastre uma unidade e use “Localizar unidade salva”. Recarregue a URL de edição e verifique
+município por teclado, telefone, mensagens e largura de celular.

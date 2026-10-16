@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { api, type Row } from "./api";
-import { Card, Field, Empty } from "./components";
-import { areasOf, cepMask, phoneMask } from "./unitFields";
+import { Card, Field } from "./components";
+import { areasOf, cepMask, phoneMask, displayPhone } from "./unitFields";
 
+import UnitList from "./UnitList";
+import { SearchSelect } from "./SearchSelect";
+import { Notification, humanError } from "./Notification";
+import { navigate, unitsPath, useLocation } from "./navigation";
 type Catalog = {
   municipalities: Row[];
   complete: boolean;
@@ -42,75 +46,75 @@ const initial = (u?: Row): Values => ({
   streetNumber: u?.street_number || "",
   complement: u?.complement || "",
   neighborhood: u?.neighborhood || "",
-  phone: u?.phone || "",
+  phone: displayPhone(u?.phone || ""),
   email: u?.email || "",
 });
 
-export default function UnitPanel({
-  units,
-  reload,
-}: {
-  units: Row[];
-  reload: () => Promise<void>;
-}) {
-  const [editing, setEditing] = useState<Row>();
-  const [generation, setGeneration] = useState(0);
-  return (
-    <div className="unit-workspace">
-      <UnitForm
-        key={`${editing?.id || "new"}-${generation}`}
-        unit={editing}
-        onCancel={() => {
-          setEditing(undefined);
-          setGeneration((g) => g + 1);
-        }}
-        onSaved={async () => {
-          await reload();
-        }}
-      />
-      <Card title="Unidades da Defensoria" tag={`${units.length} cadastradas`}>
-        {!units.length && <Empty />}
-        <div className="unit-list">
-          {units.map((u) => (
-            <article className="unit" key={u.id}>
-              <div className="unit-heading">
-                <span className="eyebrow">
-                  {u.municipality} / {u.state_code}
-                </span>
-                <span className="tag">{u.active ? "Ativa" : "Inativa"}</span>
-              </div>
-              <h3>{u.name}</h3>
-              <p>
-                {u.street
-                  ? [u.street, u.street_number, u.complement, u.neighborhood]
-                      .filter(Boolean)
-                      .join(", ")
-                  : u.address}
-              </p>
-              <p>
-                {u.phone}
-                {u.email && " · " + u.email}
-              </p>
-              <p>
-                {areasOf(u.areas)
-                  .map((a) => (a === "CIVEL" ? "Cível" : "Criminal"))
-                  .join(" · ") || "Áreas pendentes de regularização"}
-              </p>
-              <button
-                type="button"
-                className="ghost"
-                onClick={() => {
-                  setEditing(u);
-                  setGeneration((g) => g + 1);
-                }}
-              >
-                Editar {u.name}
-              </button>
-            </article>
-          ))}
-        </div>
+export default function UnitPanel() {
+  const location = useLocation();
+  const match = location.path.match(/^\/rh\/unidades\/([^/]+)\/editar$/);
+  const id = match?.[1];
+  const isNew = location.path === unitsPath + "/nova";
+  const [unit, setUnit] = useState<Row>();
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    setUnit(undefined);
+    setError("");
+    if (!id) return;
+    setBusy(true);
+    api<Row>("/rh/units/" + encodeURIComponent(id))
+      .then((u) => {
+        if (alive) setUnit(u);
+      })
+      .catch((e) => {
+        if (alive) setError(humanError(e));
+      })
+      .finally(() => {
+        if (alive) setBusy(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+  const back =
+    typeof location.state.returnTo === "string" &&
+    /^\/rh\/unidades(?:\?|$)/.test(location.state.returnTo)
+      ? location.state.returnTo
+      : unitsPath;
+  if (location.path === unitsPath) return <UnitList />;
+  if (!id && !isNew)
+    return (
+      <Card title="Página não encontrada">
+        <button onClick={() => navigate(unitsPath)}>Voltar às unidades</button>
       </Card>
-    </div>
+    );
+  if (id && (busy || !unit || unit.id !== id))
+    return (
+      <Card title="Editar unidade">
+        {error ? (
+          <Notification message={error} onDismiss={() => navigate(back)} />
+        ) : (
+          <p role="status">Carregando unidade…</p>
+        )}
+        <button className="ghost" onClick={() => navigate(back)}>
+          Voltar às unidades
+        </button>
+      </Card>
+    );
+  return (
+    <UnitForm
+      key={id || "new"}
+      unit={id ? unit : undefined}
+      onCancel={() => navigate(back)}
+      onSaved={async (_id, name) =>
+        navigate(back, {
+          message: "Unidade salva com sucesso.",
+          savedName: name,
+        })
+      }
+    />
   );
 }
 
@@ -120,7 +124,7 @@ export function UnitForm({
   onCancel,
 }: {
   unit?: Row;
-  onSaved: () => Promise<void>;
+  onSaved: (id: string, name: string) => Promise<void>;
   onCancel: () => void;
 }) {
   const [v, setV] = useState<Values>(() => initial(unit));
@@ -132,7 +136,8 @@ export function UnitForm({
   catalogRef.current = catalog;
   const [catalogBusy, setCatalogBusy] = useState(false);
   const [catalogError, setCatalogError] = useState("");
-  const [query, setQuery] = useState("");
+  const [catalogNoticeClosed, setCatalogNoticeClosed] = useState(false);
+  const catalogs = useRef(new Map<string, Promise<Catalog>>());
   const [cepBusy, setCepBusy] = useState(false);
   const [cepMessage, setCepMessage] = useState("");
   const [pending, setPending] = useState<Postal>();
@@ -151,32 +156,34 @@ export function UnitForm({
         if (alive) setStates(s);
       })
       .catch((e) => {
-        if (alive) setCatalogError(e.message);
+        if (alive) setCatalogError(humanError(e));
       });
     return () => {
       alive = false;
     };
   }, []);
-  async function loadCatalog(uf: string, sync = false) {
+  async function loadCatalog(uf: string) {
     const seq = ++catalogSequence.current;
     setCatalogBusy(true);
     setCatalogError("");
+    setCatalogNoticeClosed(false);
     try {
-      const result = await api<Catalog>(
-        `/rh/catalog/${uf}${sync ? "/sync" : ""}`,
-        sync ? "POST" : "GET",
-      );
+      let request = catalogs.current.get(uf);
+      if (!request) {
+        request = api<Catalog>(`/rh/catalog/${uf}`);
+        catalogs.current.set(uf, request);
+        request.catch(() => catalogs.current.delete(uf));
+      }
+      const result = await request;
       if (seq === catalogSequence.current) setCatalog(result);
     } catch (e) {
-      if (seq === catalogSequence.current)
-        setCatalogError((e as Error).message);
+      if (seq === catalogSequence.current) setCatalogError(humanError(e));
     } finally {
       if (seq === catalogSequence.current) setCatalogBusy(false);
     }
   }
   useEffect(() => {
     setCatalog(undefined);
-    setQuery("");
     void loadCatalog(v.stateCode);
     return () => {
       catalogSequence.current++;
@@ -210,7 +217,7 @@ export function UnitForm({
           setPending(result);
         else fillAddress(result);
       } catch (e) {
-        if (seq === cepSequence.current) setCepMessage((e as Error).message);
+        if (seq === cepSequence.current) setCepMessage(humanError(e));
       } finally {
         if (seq === cepSequence.current) setCepBusy(false);
       }
@@ -244,7 +251,7 @@ export function UnitForm({
       );
       if (!city)
         throw new Error(
-          "Município do CEP não encontrado no catálogo oficial. Sincronize a UF ou preencha manualmente.",
+          "Município do CEP não encontrado no catálogo oficial. Tente selecionar a localização manualmente.",
         );
       setV((prev) => ({
         ...prev,
@@ -253,7 +260,7 @@ export function UnitForm({
       }));
       fillAddress(result);
     } catch (e) {
-      if (seq === cepSequence.current) setCepMessage((e as Error).message);
+      if (seq === cepSequence.current) setCepMessage(humanError(e));
     } finally {
       if (seq === cepSequence.current) setCepBusy(false);
     }
@@ -267,31 +274,34 @@ export function UnitForm({
     setSuccess("");
     setV((prev) => ({ ...prev, [key]: value }));
   }
-  const normalized = (s: string) =>
-    s
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLocaleLowerCase("pt-BR");
-  const choices =
-    catalog?.municipalities.filter(
-      (m) =>
-        m.id === v.municipalityId ||
-        normalized(m.name).includes(normalized(query)),
-    ) || [];
+  const choices = [...(catalog?.municipalities || [])];
+  if (
+    unit &&
+    v.stateCode === unit.state_code &&
+    !choices.some((m) => m.id === unit.municipality_id)
+  )
+    choices.push({ id: unit.municipality_id, name: unit.municipality });
   return (
     <Card
       title={savedId ? "Editar unidade" : "Nova unidade"}
       tag="Gestão institucional"
     >
       <p className="muted">
-        Identifique a unidade, suas áreas e os contatos para o cidadão.
+        {unit
+          ? unit.name
+          : "Identifique a unidade, suas áreas e os contatos para o cidadão."}
       </p>
       <form
+        className="unit-form"
         onSubmit={async (e) => {
           e.preventDefault();
           if (saving.current) return;
           setError("");
           setSuccess("");
+          if (!v.municipalityId) {
+            setError("Selecione o município.");
+            return;
+          }
           if (!v.areas.length) {
             setError("Selecione ao menos uma área de atendimento.");
             return;
@@ -308,19 +318,25 @@ export function UnitForm({
             const result = await api<{ id: string }>(
               "/rh/units" + (savedId ? "/" + savedId : ""),
               savedId ? "PUT" : "POST",
-              v,
+              {
+                ...v,
+                phone:
+                  unit && v.phone === displayPhone(unit.phone)
+                    ? unit.phone
+                    : v.phone,
+              },
             );
             setSavedId(result.id);
             setSuccess("Unidade salva com sucesso.");
             try {
-              await onSaved();
+              await onSaved(result.id, v.name);
             } catch {
               setError(
                 "Unidade salva, mas não foi possível atualizar a lista. Recarregue a página.",
               );
             }
           } catch (e) {
-            setError((e as Error).message);
+            setError(humanError(e));
           } finally {
             saving.current = false;
             setBusy(false);
@@ -347,78 +363,7 @@ export function UnitForm({
                 <option value="inactive">Inativa</option>
               </select>
             </Field>
-            <Field label="Estado">
-              <select
-                required
-                value={v.stateCode}
-                onChange={(e) => {
-                  change("stateCode", e.target.value);
-                  change("municipalityId", "");
-                  setPending(undefined);
-                }}
-              >
-                {!states.length && (
-                  <option value={v.stateCode}>{v.stateCode}</option>
-                )}
-                {states.map((s) => (
-                  <option key={s.code} value={s.code}>
-                    {s.name} ({s.code})
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Pesquisar município">
-              <input
-                type="search"
-                value={query}
-                placeholder="Digite parte do nome"
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </Field>
-            <Field label="Município">
-              <select
-                required
-                value={v.municipalityId}
-                onChange={(e) => change("municipalityId", e.target.value)}
-              >
-                <option value="">Selecione o município</option>
-                {unit &&
-                  !choices.some((m) => m.id === unit.municipality_id) &&
-                  v.stateCode === unit.state_code && (
-                    <option value={unit.municipality_id}>
-                      {unit.municipality} (cadastro anterior — sincronize)
-                    </option>
-                  )}
-                {choices.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <div className="catalog-status">
-              <p role="status">
-                {catalogBusy
-                  ? "Carregando municípios…"
-                  : catalog?.complete
-                    ? "Catálogo oficial salvo localmente"
-                    : "Catálogo ainda não sincronizado"}
-              </p>
-              <button
-                type="button"
-                className="text-button"
-                disabled={catalogBusy}
-                onClick={() => void loadCatalog(v.stateCode, true)}
-              >
-                Sincronizar municípios
-              </button>
-            </div>
           </div>
-          {(catalogError || catalog?.warning) && (
-            <p className="error" role="alert">
-              {catalogError || catalog?.warning}
-            </p>
-          )}
           <div
             className="area-options"
             role="group"
@@ -453,12 +398,73 @@ export function UnitForm({
         </fieldset>
         <fieldset disabled={busy}>
           <legend>02 · Localização</legend>
+          <Notification
+            message={
+              catalogNoticeClosed
+                ? ""
+                : catalogError
+                  ? `${catalogError} Os demais dados do formulário foram preservados. Use “Tentar novamente” para carregar os municípios.`
+                  : catalog?.warning || ""
+            }
+            onDismiss={() => setCatalogNoticeClosed(true)}
+          />
+          {(catalogError || catalog?.warning) && (
+            <button
+              type="button"
+              className="text-button"
+              disabled={catalogBusy || busy}
+              onClick={() => {
+                catalogs.current.delete(v.stateCode);
+                void loadCatalog(v.stateCode);
+              }}
+            >
+              {catalogBusy ? "Carregando municípios…" : "Tentar novamente"}
+            </button>
+          )}
           {unit?.address && (
             <p className="legacy-address">
               Endereço anterior preservado: {unit.address}
             </p>
           )}
           <div className="form-grid">
+            <Field label="Estado">
+              <select
+                required
+                value={v.stateCode}
+                onChange={(e) => {
+                  change("stateCode", e.target.value);
+                  change("municipalityId", "");
+                  setPending(undefined);
+                }}
+              >
+                {!states.length && (
+                  <option value={v.stateCode}>{v.stateCode}</option>
+                )}
+                {states.map((s) => (
+                  <option key={s.code} value={s.code}>
+                    {s.name} ({s.code})
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <div>
+              <SearchSelect
+                key={v.stateCode}
+                label="Município"
+                value={v.municipalityId}
+                options={choices as { id: string; name: string }[]}
+                busy={catalogBusy}
+                disabled={busy || !!catalogError}
+                onChange={(value) => change("municipalityId", value)}
+              />
+              <p className="hint" role="status">
+                {catalogBusy
+                  ? "Carregando municípios…"
+                  : catalog?.complete
+                    ? "Catálogo oficial salvo localmente"
+                    : ""}
+              </p>
+            </div>
             <Field label="CEP">
               <input
                 required
@@ -567,19 +573,19 @@ export function UnitForm({
             </Field>
           </div>
         </fieldset>
-        {error && (
-          <p className="error" role="alert">
-            {error}
-          </p>
-        )}
-        {success && (
-          <p className="success" role="status">
-            {success}
-          </p>
-        )}
+        <Notification message={error} onDismiss={() => setError("")} />
+        <Notification
+          message={success}
+          kind="success"
+          onDismiss={() => setSuccess("")}
+        />
         <div className="form-actions">
           <button disabled={busy || cepBusy} type="submit">
-            {busy ? "Salvando…" : "Salvar unidade"}
+            {busy
+              ? "Salvando…"
+              : savedId
+                ? "Salvar alterações"
+                : "Cadastrar unidade"}
           </button>
           <button
             disabled={busy}
@@ -587,7 +593,7 @@ export function UnitForm({
             type="button"
             onClick={onCancel}
           >
-            {savedId ? "Cadastrar outra unidade" : "Limpar formulário"}
+            Cancelar
           </button>
         </div>
       </form>

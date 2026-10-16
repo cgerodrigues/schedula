@@ -92,6 +92,51 @@ public class InstitutionService {
             + " u.name");
   }
 
+  private static final String UNIT_FROM =
+      " from defensoria_unit u join municipality m on m.id=u.municipality_id";
+  private static final String UNIT_SELECT =
+      "select u.*,m.name municipality,m.state_code,m.ibge_code,coalesce((select"
+          + " string_agg(area,',' order by area) from unit_area where unit_id=u.id),'') areas";
+
+  public Map<String, Object> unit(UUID id) {
+    return db.one(UNIT_SELECT + UNIT_FROM + " where u.id=?", id);
+  }
+
+  public record UnitPage(
+      List<Map<String, Object>> items, long total, int page, int size, long totalPages) {}
+
+  @Transactional(
+      readOnly = true,
+      isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+  public UnitPage searchUnits(
+      String name, String municipality, String area, Boolean active, int page, int size) {
+    require(page >= 1 && size >= 1 && size <= 100, "Página ou tamanho inválido.");
+    require(area.isEmpty() || Set.of("CIVEL", "CRIMINAL").contains(area), "Área inválida.");
+    String where =
+        " where position(lower(?) in lower(u.name))>0"
+            + " and position(lower(?) in lower(m.name))>0";
+    var args = new ArrayList<Object>(List.of(name.trim(), municipality.trim()));
+    if (!area.isEmpty()) {
+      where += " and exists(select 1 from unit_area a where a.unit_id=u.id and a.area=?)";
+      args.add(area);
+    }
+    if (active != null) {
+      where += " and u.active=?";
+      args.add(active);
+    }
+    long total =
+        db.jdbc.queryForObject("select count(*)" + UNIT_FROM + where, Long.class, args.toArray());
+    long pages = Math.max(1, (total + size - 1) / size);
+    int current = (int) Math.min(page, pages);
+    args.add(size);
+    args.add((long) (current - 1) * size);
+    var items =
+        db.list(
+            UNIT_SELECT + UNIT_FROM + where + " order by lower(u.name),u.id limit ? offset ?",
+            args.toArray());
+    return new UnitPage(items, total, current, size, pages);
+  }
+
   public List<Map<String, Object>> defenders() {
     return db.list(
         "select id,username,name,status from staff_user where role='DEFENSOR' order by name");

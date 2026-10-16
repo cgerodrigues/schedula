@@ -16,3 +16,9 @@ export function areasOf(value: unknown): string[] {
       ? value
       : [];
 }
+export function displayPhone(value: string = "") {
+  return /^[\d\s()+.-]+$/.test(value) &&
+    [10, 11].includes(value.replace(/\D/g, "").length)
+    ? phoneMask(value)
+    : value;
+}
