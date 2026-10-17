@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { api, type Row } from "./api";
 import { Field, Form } from "./components";
-import { navigate, unitsPath, useLocation } from "./navigation";
+import { navigate, unitsPath, defendersPath, useLocation } from "./navigation";
 import InstitutionPanel from "./InstitutionPanel";
 import DefenderPanel from "./DefenderPanel";
 import "./style.css";
@@ -35,9 +35,14 @@ export function App() {
   const location = useLocation();
   const section = location.path.startsWith(unitsPath)
     ? "units"
-    : location.state.section || "overview";
+    : location.path.startsWith(defendersPath)
+      ? "defenders"
+      : location.state.section || "overview";
   const setSection = (key: string) =>
-    navigate(key === "units" ? unitsPath : "/", { section: key });
+    navigate(
+      key === "units" ? unitsPath : key === "defenders" ? defendersPath : "/",
+      { section: key },
+    );
   const [data, setData] = useState<Record<string, Row[]>>({});
   const [error, setError] = useState("");
   async function identify() {
@@ -53,11 +58,15 @@ export function App() {
     void identify();
   }, []);
   async function reload() {
-    if (!user || (user.role === "RH" && section === "units")) return;
+    if (
+      !user ||
+      (user.role === "RH" && ["units", "defenders"].includes(section))
+    )
+      return;
     const role = user.role === "RH" ? "rh" : "defender";
     const resources =
       role === "rh"
-        ? ["units", "defenders", "affiliations", "notifications"]
+        ? ["units", section === "overview" ? "defenders/indicators" : "defenders", "affiliations", "notifications"]
         : ["affiliations", "appointments", "slots", "blocks"];
     const results = await Promise.all(
       resources.map(async (key) => [key, await api("/" + role + "/" + key)]),
@@ -71,7 +80,8 @@ export function App() {
       void reload().catch((e) => setError(e.message));
     }
   }, [user, section]);
-  if (activationToken) return <Activation token={activationToken} />;
+  if (activationToken)
+    return <Activation key={activationToken} token={activationToken} />;
   if (loading) return <div className="loading">Carregando Schedula…</div>;
   if (!user)
     return (
@@ -151,7 +161,7 @@ export function App() {
         ];
   nav.push(["password", "Alterar minha senha", "⚿"]);
   return (
-    <div className="app-layout">
+    <div className={`app-layout${user.role === "RH" ? " rh-layout" : ""}`}>
       <aside>
         <div className="brand">
           <span className="logo">S</span> schedula
@@ -178,12 +188,15 @@ export function App() {
         </div>
       </aside>
       <main className="workspace">
-        <header>
+        <header className={user.role === "RH" && section === "defenders" ? "defenders-header" : undefined}>
           <div>
             <span className="eyebrow">
               SCHEDULA / {user.role === "RH" ? "INSTITUIÇÃO" : "DEFENSOR"}
             </span>
             <h1>{nav.find((n) => n[0] === section)?.[1]}</h1>
+            {user.role === "RH" && section === "defenders" && (
+              <p className="defenders-subtitle">Organize a rede. Amplie o acesso ao atendimento.</p>
+            )}
           </div>
           <div className="user">
             <span className="avatar">{user.name.slice(0, 1)}</span>
@@ -207,13 +220,13 @@ export function App() {
             </button>
           </div>
         </header>
-        <div className="page-intro">
+        {!(user.role === "RH" && section === "defenders") && <div className="page-intro">
           <p>
             {user.role === "RH"
               ? "Organize a rede. Amplie o acesso ao atendimento."
               : "Seu tempo organizado, seu atendimento mais próximo."}
           </p>
-          {section !== "units" && (
+          {!["units", "defenders"].includes(section) && (
             <button
               className="text-button"
               onClick={() => {
@@ -224,15 +237,16 @@ export function App() {
               Atualizar ↻
             </button>
           )}
-        </div>
+        </div>}
         {error && (
           <p className="error" role="alert">
             {error}
           </p>
         )}
-        {section === "units" && user.role !== "RH" ? (
+        {["units", "defenders"].includes(section) && user.role !== "RH" ? (
           <div role="alert">
-            Você não tem permissão para acessar a gestão de unidades.
+            Você não tem permissão para acessar a gestão de{" "}
+            {section === "units" ? "unidades" : "defensores"}.
             <button className="ghost" onClick={() => setSection("overview")}>
               Voltar ao painel
             </button>

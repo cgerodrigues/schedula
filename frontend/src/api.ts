@@ -1,3 +1,6 @@
+export class ApiError extends Error {
+  constructor(message: string, public status: number) { super(message); }
+}
 export type Row = Record<string, any>;
 export async function api<T = Row[]>(
   path: string,
@@ -28,7 +31,7 @@ export async function api<T = Row[]>(
   });
   if (!response.ok) {
     const detail = await response.json().catch(() => ({}));
-    throw new Error(
+    throw new ApiError(
       detail.detail ||
         (response.status === 401
           ? "Sessão expirada ou credenciais inválidas. Entre novamente."
@@ -36,7 +39,7 @@ export async function api<T = Row[]>(
             ? "Registro não encontrado ou indisponível."
             : response.status === 403
               ? "Você não tem permissão para esta operação."
-              : "Não foi possível concluir. Verifique os dados e tente novamente."),
+              : "Não foi possível concluir. Verifique os dados e tente novamente."), response.status,
     );
   }
   const text = await response.text();

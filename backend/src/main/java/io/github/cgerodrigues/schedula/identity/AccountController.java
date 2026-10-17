@@ -45,7 +45,8 @@ public class AccountController {
   }
 
   @PostMapping("/api/rh/defenders/{id}/invitation")
-  public AccountService.Invitation invite(@PathVariable UUID id, Principal actor) {
+  public AccountService.Invitation invite(@PathVariable UUID id, Principal actor, HttpServletResponse response) {
+    response.setHeader("Cache-Control", "no-store");
     return accounts.invite(id, actor.getName());
   }
 
@@ -55,8 +56,9 @@ public class AccountController {
   }
 
   @PostMapping("/api/auth/activation/check")
-  public void check(@Valid @RequestBody Token token) {
-    accounts.check(token.token());
+  public AccountService.Identity check(@Valid @RequestBody Token token, HttpServletResponse response) {
+    response.setHeader("Cache-Control", "no-store");
+    return accounts.check(token.token());
   }
 
   @PostMapping("/api/auth/activation")

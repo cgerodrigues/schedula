@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+export const defendersPath = "/rh/defensores";
 export const unitsPath = "/rh/unidades";
 export function navigate(
   path: string,

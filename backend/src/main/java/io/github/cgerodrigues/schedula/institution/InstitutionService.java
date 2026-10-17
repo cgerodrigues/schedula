@@ -24,7 +24,12 @@ public class InstitutionService {
       @Pattern(regexp = "[A-Z]{2}") @NotNull String stateCode) {}
 
   public record Defender(
-      @NotBlank @Size(max = 120) String username, @NotBlank @Size(max = 150) String name) {}
+      @NotBlank @Size(max = 120) String username, @NotBlank @Size(max = 150) String name) {
+    @com.fasterxml.jackson.annotation.JsonAnySetter
+    public void rejectUnknown(String key, Object value) {
+      throw new IllegalArgumentException("Cadastro permite apenas nome e usuário inicial.");
+    }
+  }
 
   public record Affiliation(
       @NotNull UUID defenderId,

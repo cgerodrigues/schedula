@@ -90,7 +90,9 @@ public class AccountService {
 
   @Transactional
   public void revoke(UUID id, String actor) {
-    account(id);
+    var account = account(id);
+    require(account.get("role").equals("DEFENSOR") && account.get("status").equals("PENDING_ACTIVATION"),
+        "Somente defensores pendentes podem ter convites revogados.");
     revokeOpen(id);
     db.audit(actor, "INVITATION_REVOKED", id);
   }
@@ -111,15 +113,16 @@ public class AccountService {
         "Convite expirado. Solicite outro ao RH.");
   }
 
-  @Transactional(readOnly = true)
-  public void check(String token) {
-    var invite = invitation(token);
-    valid(invite);
-    require(
-        db.exists(
-            "select exists(select 1 from staff_user where id=? and status='PENDING_ACTIVATION')",
-            invite.get("account_id")),
-        "Convite indisponível.");
+  public record Identity(String name, String username) {}
+
+  @Transactional
+  public Identity check(String token) {
+    var first = invitation(token);
+    var account = account((UUID) first.get("account_id"));
+    valid(invitation(token));
+    require(account.get("status").equals("PENDING_ACTIVATION")
+        && account.get("role").equals("DEFENSOR"), "Convite indisponível.");
+    return new Identity((String) account.get("name"), (String) account.get("username"));
   }
 
   @Transactional

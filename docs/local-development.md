@@ -206,3 +206,31 @@ o formulário reutiliza consultas por UF durante a edição, sem botão de sincr
 Homologação: no menu Unidades, combine filtros, avance uma página, abra/cancele uma edição,
 cadastre uma unidade e use “Localizar unidade salva”. Recarregue a URL de edição e verifique
 município por teclado, telefone, mensagens e largura de celular.
+
+
+### Gestão de defensores — Etapa 2A
+
+Rotas: `/rh/defensores`, `/rh/defensores/novo`, `/rh/defensores/:id/editar`.
+A listagem usa `GET /api/rh/defenders/search` com `name`, `status`, `page` (início 1)
+e `size` (máximo 100). O GET antigo continua retornando array. GET por ID carrega
+os dados e PUT por ID aceita **somente name**; campos extras são rejeitados,
+inclusive username, password, password_hash, role e status. No cadastro, apenas
+name e username são aceitos. Nenhuma migration ou alteração de credenciais existentes.
+
+O modal guarda o convite somente em memória enquanto aberto, com validade de
+24 horas. Se a emissão falhar após o cadastro, “Gerar convite” reutiliza a conta
+salva. `/api/auth/activation/check` agora devolve somente nome e username após
+validar o token, sem cache. Ativação mantém uso único e definição de senha pelo
+próprio defensor (mínimo 12 caracteres Unicode, máximo 72 bytes UTF-8).
+
+Homologue cadastro → modal/copiar/fechar → filtros/páginas → editar nome →
+regenerar/revogar convite pendente. Em conta de teste, abra um convite válido,
+confira identificação, limites/confirmação/visibilidade da senha e confirme que
+“Ir para o login” aparece só após sucesso. Não use contas existentes para esses testes.
+
+Refinamento de homologação: a Visão geral usa `GET /api/rh/defenders/indicators`
+(`{total}`), protegido para RH, sem carregar a coleção de defensores. Revogação
+e substituição de convite válido exigem confirmação na interface; o backend
+recusa revogação para contas ativas. A busca ignora acentos sem alterar nomes.
+Convites indisponíveis e ativação concluída possuem estados visuais próprios;
+falhas transitórias na verificação permitem tentar novamente.

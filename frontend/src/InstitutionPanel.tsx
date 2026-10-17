@@ -1,3 +1,4 @@
+import DefenderManagement from "./DefenderManagement";
 import UnitPanel from "./UnitPanel";
 import { areasOf } from "./unitFields";
 import { useState } from "react";
@@ -13,28 +14,6 @@ export default function InstitutionPanel({
   reload: () => Promise<void>;
 }) {
   const [selectedUnit, setSelectedUnit] = useState("");
-  const [invitation, setInvitation] = useState("");
-  const [inviteError, setInviteError] = useState("");
-  const [copied, setCopied] = useState(false);
-  async function invite(id: string) {
-    setInvitation("");
-    setInviteError("");
-    setCopied(false);
-    try {
-      const result = await api<{ token: string }>(
-        "/rh/defenders/" + id + "/invitation",
-        "POST",
-      );
-      setInvitation(
-        window.location.origin +
-          window.location.pathname +
-          "#activate=" +
-          encodeURIComponent(result.token),
-      );
-    } catch (e) {
-      setInviteError((e as Error).message);
-    }
-  }
   const {
     units = [],
     defenders = [],
@@ -56,7 +35,7 @@ export default function InstitutionPanel({
                 new Set(units.map((u) => u.municipality_id)).size,
               ],
               ["Unidades", units.length],
-              ["Defensores", defenders.length],
+              ["Defensores", (data["defenders/indicators"] as unknown as { total: number })?.total ?? 0],
               ["Vínculos ativos", affiliations.length],
             ].map(([l, v]) => (
               <div className="stat" key={l}>
@@ -128,111 +107,7 @@ export default function InstitutionPanel({
         </>
       )}
       {section === "units" && <UnitPanel />}
-      {section === "defenders" && (
-        <div className="split">
-          <Card title="Cadastrar defensor">
-            <Form
-              onSubmit={async (f) => {
-                const created = await api<{ id: string }>(
-                  "/rh/defenders",
-                  "POST",
-                  Object.fromEntries(f),
-                );
-                await reload();
-                await invite(created.id);
-              }}
-            >
-              <Field label="Nome completo">
-                <input name="name" maxLength={150} required />
-              </Field>
-              <Field label="Usuário de acesso">
-                <input
-                  name="username"
-                  autoComplete="off"
-                  maxLength={120}
-                  required
-                />
-              </Field>
-            </Form>
-          </Card>
-          <Card title="Equipe de defensores">
-            {inviteError && (
-              <p className="error" role="alert">
-                {inviteError}
-              </p>
-            )}
-            {invitation && (
-              <div className="invitation">
-                <p>
-                  Convite válido por 24 horas. Compartilhe em canal privado. O
-                  token só é exibido agora.
-                </p>
-                <Field label="Link de ativação">
-                  <input readOnly value={invitation} />
-                </Field>
-                <button
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(invitation);
-                      setCopied(true);
-                    } catch {
-                      setInviteError(
-                        "Não foi possível copiar. Selecione e copie o link manualmente.",
-                      );
-                    }
-                  }}
-                >
-                  {copied ? "Link copiado" : "Copiar link"}
-                </button>
-                <button className="ghost" onClick={() => setInvitation("")}>
-                  Ocultar link
-                </button>
-              </div>
-            )}
-
-            {defenders.map((d) => (
-              <div className="list-row" key={d.id}>
-                <div>
-                  <strong>{d.name}</strong>
-                  <p className="muted">{d.username}</p>
-                </div>
-                <div>
-                  <span className="tag">
-                    {d.status === "ACTIVE" ? "Ativo" : "Ativação pendente"}
-                  </span>
-                  {d.status === "PENDING_ACTIVATION" && (
-                    <>
-                      <button
-                        className="text-button"
-                        onClick={() => void invite(d.id)}
-                      >
-                        Gerar novo convite
-                      </button>
-                      <button
-                        className="text-button"
-                        onClick={async () => {
-                          try {
-                            await api(
-                              "/rh/defenders/" + d.id + "/invitation",
-                              "DELETE",
-                            );
-                            setInvitation("");
-                          } catch (e) {
-                            setInviteError((e as Error).message);
-                          }
-                        }}
-                      >
-                        Revogar convite
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-            {!defenders.length && <Empty />}
-          </Card>
-        </div>
-      )}
+      {section === "defenders" && <DefenderManagement />}
       {section === "affiliations" && (
         <div className="split">
           <Card title="Autorizar atuação">

@@ -908,3 +908,85 @@ hr {
 .unit-form .search-select + .hint {
   margin: 5px 0 0;
 }
+
+.defender-fields { border: 0; padding: 0; margin: 20px 0; min-width: 0; display: grid; gap: 14px; }
+.defender-filters { grid-template-columns: 2fr 1fr; }
+.defenders-table th:first-child { width: 30%; }
+.defenders-table th:last-child { width: 25%; }
+.defender-invite-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.defender-invite-actions .text-button { padding: 6px 4px; font-size: 12px; }
+.invitation-status { display: block; margin-top: 6px; color: #66746c; }
+.invitation-modal { border: 1px solid #dce4e0; border-radius: 16px; padding: 28px; width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; color: #203c37; }
+.invitation-modal::backdrop { background: #132f2bb3; }
+.invitation-modal input { width: 100%; }
+.invitation-modal > button { margin: 16px 12px 0 0; }
+.activation-page { max-width: 680px; margin: auto; width: 100%; padding: 32px 20px; }
+.activation-identity { display: grid; grid-template-columns: auto 1fr; gap: 12px; padding: 16px; background: #f4f7f4; border-radius: 8px; }
+.activation-identity dt { font-weight: 700; }
+.activation-identity dd { margin: 0; overflow-wrap: anywhere; }
+.password-requirements { padding-left: 0; list-style: none; color: #66746c; font-size: 13px; }
+.password-requirements li { margin: 8px 0; }
+.password-requirements .met { color: #245d45; }
+@media (max-width: 700px) {
+  .defender-filters { grid-template-columns: 1fr; }
+  .activation-page { padding: 16px 8px; }
+  .activation-identity { grid-template-columns: 1fr; gap: 4px; }
+  .activation-identity dd { margin-bottom: 10px; }
+}
+
+/* Refinamentos de homologação da gestão de defensores. */
+.defender-form { width: 100%; max-width: 880px; margin-inline: auto; }
+.defender-form .create-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.defender-form .edit-fields { max-width: 480px; }
+.defender-row-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.defender-action-menu { position: relative; }
+.defender-action-options { position: fixed; max-width: calc(100vw - 16px); min-width: 175px; z-index: 10; background: white; padding: 6px; border: 1px solid #d5dfda; border-radius: 8px; box-shadow: 0 4px 14px #173c3020; }
+.defender-action-options button { display: block; width: 100%; text-align: left; padding: 10px; }
+.danger-text { color: #9e302c; }
+.danger-button { background: #9e302c; }
+.danger-button:hover { background: #802521; }
+.notice { width: 100%; min-width: 0; }
+.notice > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.notice .text-button { width: auto; flex: 0 0 auto; }
+.activation-page { max-width: 560px; }
+.activation-page form { margin-top: 20px; }
+.activation-page .card-heading { margin-bottom: 12px; }
+.activation-page .activation-identity { gap: 6px 16px; padding: 12px 16px; font-size: 14px; }
+.activation-page .defender-fields { margin: 16px 0 20px; gap: 18px; }
+.password-field { min-width: 0; }
+.password-field > label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 7px; }
+.password-input { position: relative; }
+.password-input input { width: 100%; padding-right: 48px; }
+.password-input .password-eye { position: absolute; right: 2px; top: 2px; bottom: 2px; display: grid; place-items: center; width: 42px; padding: 0; background: transparent; color: #42665b; border: 0; }
+.password-eye[aria-pressed="true"] { background: #edf3ef; }
+.password-feedback { margin: 6px 0 0; font-size: 12px; color: #66746c; line-height: 1.5; }
+.password-feedback .met { color: #245d45; }
+.password-too-long { margin: 4px 0 0; color: #9e302c; }
+.activation-result { line-height: 1.6; }
+.activation-result button { margin-top: 12px; }
+.activation-check { color: #245d45; font-weight: bold; }
+@media (max-width: 640px) {
+  .defender-form .create-fields { grid-template-columns: 1fr; }
+  .activation-page .activation-identity { grid-template-columns: 1fr; gap: 3px; }
+}
+
+/* Acabamento do cabeçalho de Defensores e rodapé do RH. */
+.rh-layout .workspace { display: flex; flex-direction: column; }
+.rh-layout .workspace > * { flex-shrink: 0; }
+.rh-layout .workspace > footer { margin-top: auto; padding-top: 45px; }
+.defenders-header { margin-bottom: 24px; }
+.defenders-subtitle { margin: 6px 0 0; color: #71867a; }
+.activation-identity::after {
+  content: "";
+  grid-column: 1 / -1;
+  grid-row: 2;
+  border-top: 1px solid white;
+  margin: 3px 0;
+}
+@media (max-width: 720px) {
+  .app-layout.rh-layout { display: flex; flex-direction: column; }
+  .defenders-subtitle { font-size: 11px; }
+}
+@media (max-width: 700px) {
+  .activation-identity::after { grid-row: 3; margin: 6px 0; }
+}
